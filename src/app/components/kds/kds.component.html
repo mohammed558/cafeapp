@@ -1,0 +1,147 @@
+<div class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 min-h-screen">
+  <div class="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden">
+    <div class="layout-container flex h-full grow flex-col">
+      <!-- Header Section -->
+      <header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-primary/20 bg-white dark:bg-background-dark px-6 py-4 lg:px-10">
+        <div class="flex items-center gap-8">
+          <div class="flex items-center gap-3 text-primary">
+            <span class="material-symbols-outlined text-4xl">coffee_maker</span>
+            <h1 class="text-slate-900 dark:text-slate-100 text-2xl font-bold leading-tight tracking-tight">KITCHEN OPS</h1>
+          </div>
+          <nav class="hidden md:flex items-center gap-6">
+            <button (click)="setTab('active')" 
+              [class.text-primary]="currentTab() === 'active'"
+              [class.border-b-2]="currentTab() === 'active'"
+              [class.border-primary]="currentTab() === 'active'"
+              class="pb-1 text-base font-bold transition-all">Active Orders ({{currentTab() === 'active' ? orders().length : '...'}})</button>
+            <button (click)="setTab('completed')" 
+              [class.text-primary]="currentTab() === 'completed'"
+              [class.border-b-2]="currentTab() === 'completed'"
+              [class.border-primary]="currentTab() === 'completed'"
+              class="text-slate-600 dark:text-slate-400 text-base font-medium hover:text-primary transition-all">Completed ({{completedOrdersCount()}})</button>
+          </nav>
+        </div>
+        <div class="flex flex-1 justify-end gap-4 items-center">
+          <div class="hidden sm:flex items-center bg-primary/10 px-4 py-2 rounded-lg text-primary font-bold">
+            <span class="material-symbols-outlined mr-2">timer</span>
+            <span>Avg Prep: 4:30m</span>
+          </div>
+        </div>
+      </header>
+      
+      <!-- Dashboard Grid -->
+      <main class="p-6 lg:p-10 grow">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <!-- Order Card -->
+          <div *ngFor="let order of orders()" 
+               [class.border-red-500]="order.status === 'pending'"
+               [class.border-primary]="order.status === 'preparing'"
+               [class.border-green-500]="order.status === 'ready'"
+               [class.border-slate-300]="order.status === 'served'"
+               class="flex flex-col bg-white dark:bg-slate-900 rounded-xl shadow-xl border-l-8 overflow-hidden ring-1 ring-slate-200 dark:ring-slate-800 transition-all">
+            
+            <div class="p-4 flex justify-between items-start" 
+                 [class.bg-red-50]="order.status === 'pending'"
+                 [class.dark:bg-red-900\/20]="order.status === 'pending'"
+                 [class.bg-primary\/5]="order.status === 'preparing'"
+                 [class.bg-green-50]="order.status === 'ready'"
+                 [class.bg-slate-50]="order.status === 'served'">
+              <div>
+                <h3 class="text-xl font-bold text-slate-900 dark:text-white">Order #{{order.id.slice(-4)}}</h3>
+                <p class="text-slate-600 dark:text-slate-400 font-bold">TABLE {{order.table_number}}</p>
+              </div>
+              <!-- Only show live timer for non-served orders -->
+              <div *ngIf="order.status !== 'served'" class="bg-slate-900 dark:bg-slate-100 dark:text-slate-900 text-white px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1">
+                <span class="material-symbols-outlined text-sm">schedule</span>
+                {{getTimeElapsed(order.created_at!)}}
+              </div>
+              <!-- Served badge -->
+              <div *ngIf="order.status === 'served'" class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-black flex items-center gap-1">
+                <span class="material-symbols-outlined text-sm">check_circle</span> SERVED
+              </div>
+            </div>
+
+            <div class="p-4 grow space-y-4">
+              <div class="space-y-3">
+                <div *ngFor="let item of order.order_items" class="flex flex-col border-b border-slate-100 dark:border-slate-800 pb-2 last:border-0 transition-all hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                  <div class="flex justify-between items-center px-1">
+                    <span class="text-lg font-bold">{{item.quantity}}&times; {{item.menu_items?.name}}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Payment Details for Completed/Served -->
+              <div *ngIf="order.status === 'served'" class="pt-4 border-t-2 border-dashed border-slate-100 dark:border-slate-800 space-y-2">
+                <div class="flex justify-between items-center">
+                  <span class="text-xs font-black text-slate-400 uppercase">Total</span>
+                  <span class="text-lg font-black text-primary">${{order.total_price}}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-xs font-black text-slate-400 uppercase">Method</span>
+                  <!-- Paid -->
+                  <div *ngIf="order.payment_status === 'completed'" class="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-green-100 text-green-700">
+                    <span class="material-symbols-outlined text-sm">check_circle</span>
+                    <span class="text-[10px] font-black uppercase">{{order.payment_mode}}</span>
+                  </div>
+                  <!-- Awaiting cash confirmation -->
+                  <div *ngIf="order.payment_status !== 'completed' && order.payment_mode === 'cash'" class="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-amber-100 text-amber-700 animate-pulse">
+                    <span class="material-symbols-outlined text-sm">pending</span>
+                    <span class="text-[10px] font-black uppercase">AWAITING CASH</span>
+                  </div>
+                  <!-- Awaiting online payment -->
+                  <div *ngIf="order.payment_status !== 'completed' && order.payment_mode !== 'cash'" class="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500">
+                    <span class="material-symbols-outlined text-sm">hourglass_top</span>
+                    <span class="text-[10px] font-black uppercase">UNPAID</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="p-4 grid gap-3 bg-slate-50 dark:bg-slate-800/50">
+              <button *ngIf="order.status === 'pending'" (click)="updateStatus(order.id, 'preparing')"
+                      class="flex items-center justify-center gap-2 h-14 rounded-xl bg-primary text-white font-black hover:bg-primary/90 shadow-lg shadow-primary/20 active:scale-95 transition-all">
+                <span class="material-symbols-outlined">skillet</span> START PREP
+              </button>
+              
+              <button *ngIf="order.status === 'preparing'" (click)="updateStatus(order.id, 'ready')"
+                      class="flex items-center justify-center gap-2 h-14 rounded-xl bg-green-600 text-white font-black hover:bg-green-700 shadow-lg shadow-green-200/20 active:scale-95 transition-all">
+                <span class="material-symbols-outlined">check_circle</span> MARK READY
+              </button>
+
+              <button *ngIf="order.status === 'ready'" (click)="updateStatus(order.id, 'served')"
+                      class="flex items-center justify-center gap-2 h-14 rounded-xl bg-slate-900 text-white font-black hover:bg-slate-800 active:scale-95 transition-all">
+                <span class="material-symbols-outlined">done_all</span> SERVED
+              </button>
+
+              <!-- Confirm Cash Received button (KDS) -->
+              <button *ngIf="order.status === 'served' && order.payment_status !== 'completed' && order.payment_mode === 'cash'"
+                      (click)="confirmCashPayment(order.id)"
+                      class="flex items-center justify-center gap-2 h-14 rounded-xl bg-amber-500 text-white font-black hover:bg-amber-600 shadow-lg shadow-amber-500/20 active:scale-95 transition-all animate-pulse">
+                <span class="material-symbols-outlined">payments</span> CONFIRM CASH RECEIVED
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer Stats -->
+        <div class="mt-10 bg-white dark:bg-background-dark/80 rounded-xl p-6 border border-primary/10">
+          <div class="flex flex-col md:flex-row justify-between items-center gap-6">
+            <div class="flex gap-10">
+              <div>
+                <p class="text-sm font-bold text-slate-500 uppercase tracking-tighter">Queue Size</p>
+                <p class="text-3xl font-black text-primary">{{orders().length}} Orders</p>
+              </div>
+              <div>
+                <p class="text-sm font-bold text-slate-500 uppercase tracking-tighter">Live Status</p>
+                <p class="text-3xl font-black text-slate-900 dark:text-white">Active</p>
+              </div>
+            </div>
+            <button (click)="fetchOrders()" class="bg-primary text-white font-black px-8 py-4 rounded-xl shadow-lg hover:scale-105 transition-transform flex items-center gap-2">
+              <span class="material-symbols-outlined">sync</span> REFRESH QUEUE
+            </button>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</div>

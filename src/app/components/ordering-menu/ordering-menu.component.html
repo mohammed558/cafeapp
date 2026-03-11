@@ -1,0 +1,222 @@
+<div class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 min-h-screen">
+  
+  <!-- Table Selection Overlay -->
+  <div *ngIf="!selectedTable()" class="fixed inset-0 z-[100] flex items-center justify-center bg-background-dark/80 backdrop-blur-xl p-4 animate-in fade-in duration-500">
+    <div class="w-full max-w-[480px] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl p-8 transform transition-all animate-in zoom-in-95 duration-300">
+      <div class="text-center mb-8">
+        <div class="inline-flex items-center justify-center size-16 rounded-2xl bg-primary text-white mb-4 shadow-lg shadow-primary/30">
+          <span class="material-symbols-outlined text-3xl">restaurant</span>
+        </div>
+        <h1 class="text-3xl font-black tracking-tight mb-2">Welcome!</h1>
+        <p class="text-slate-500 dark:text-slate-400 font-medium">Please select your table to start ordering</p>
+      </div>
+
+      <div class="grid grid-cols-5 gap-3 mb-8">
+        <button *ngFor="let n of [1,2,3,4,5,6,7,8,9,10]" 
+          (click)="selectTable(n)"
+          class="aspect-square flex items-center justify-center rounded-xl border-2 border-slate-100 dark:border-slate-800 text-xl font-bold hover:border-primary hover:text-primary transition-all active:scale-95">
+          {{n}}
+        </button>
+      </div>
+
+      <div class="bg-primary/5 border border-primary/10 rounded-xl p-4 flex items-center gap-3">
+        <span class="material-symbols-outlined text-primary">info</span>
+        <p class="text-sm font-medium text-primary">Table selection is limited from 1 to 10</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden">
+    <div class="layout-container flex h-full grow flex-col">
+      <!-- Top Navigation Bar -->
+      <header class="sticky top-0 z-50 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-primary/10 px-4 md:px-10 py-4">
+        <div class="max-w-[960px] mx-auto flex items-center justify-between whitespace-nowrap">
+          <div class="flex items-center gap-3">
+            <div class="flex items-center justify-center size-10 rounded-xl bg-primary text-white">
+              <span class="material-symbols-outlined">coffee</span>
+            </div>
+            <h2 class="text-slate-900 dark:text-slate-100 text-xl font-bold leading-tight tracking-tight">Morning Roast</h2>
+          </div>
+          <div class="flex items-center gap-4">
+            <div (click)="selectedTable.set(null)" class="cursor-pointer bg-primary/10 px-3 py-1.5 rounded-lg border border-primary/20 hover:bg-primary/20 transition-all">
+              <span class="text-primary text-sm font-semibold">Table {{selectedTable()}}</span>
+            </div>
+            <button class="flex items-center justify-center size-10 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+              <span class="material-symbols-outlined">search</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main class="flex-1 max-w-[960px] mx-auto w-full pb-32">
+        
+        <!-- Active Order Status Tracker -->
+        <div *ngIf="activeOrder()" class="p-4 animate-in slide-in-from-top-4 duration-500">
+          <div class="bg-white dark:bg-slate-900 rounded-2xl border border-primary/10 shadow-xl overflow-hidden">
+            <div class="p-6 bg-primary/5 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="size-2 rounded-full bg-primary animate-pulse"></div>
+                <h3 class="font-bold text-lg uppercase tracking-wider">Current Order</h3>
+              </div>
+              <span class="px-3 py-1 rounded-full bg-primary text-white text-xs font-black uppercase tracking-widest">{{activeOrder()?.status}}</span>
+            </div>
+            <div class="p-6">
+              <div class="flex justify-between items-center mb-6">
+                <div class="flex flex-col items-center">
+                  <div class="bg-primary size-10 rounded-full flex items-center justify-center border-2 border-primary transition-all">
+                    <span class="material-symbols-outlined text-sm text-white">receipt_long</span>
+                  </div>
+                  <span class="text-[10px] mt-2 font-bold uppercase">Pending</span>
+                </div>
+                <div class="flex-1 h-[2px] mx-2 bg-slate-100 dark:bg-slate-800">
+                  <div [style.width]="(activeOrder()?.status !== 'pending') ? '100%' : '0%'" class="h-full bg-primary transition-all duration-1000"></div>
+                </div>
+                <div class="flex flex-col items-center">
+                  <div [class.bg-primary]="activeOrder()?.status !== 'pending'" class="size-10 rounded-full flex items-center justify-center border-2 border-primary transition-all">
+                    <span class="material-symbols-outlined text-sm" [class.text-white]="activeOrder()?.status !== 'pending'">skillet</span>
+                  </div>
+                  <span class="text-[10px] mt-2 font-bold uppercase">Prep</span>
+                </div>
+                <div class="flex-1 h-[2px] mx-2 bg-slate-100 dark:bg-slate-800">
+                  <div [style.width]="(activeOrder()?.status === 'ready' || activeOrder()?.status === 'served') ? '100%' : '0%'" class="h-full bg-primary transition-all duration-1000"></div>
+                </div>
+                <div class="flex flex-col items-center">
+                  <div [class.bg-primary]="activeOrder()?.status === 'ready' || activeOrder()?.status === 'served'" class="size-10 rounded-full flex items-center justify-center border-2 border-primary transition-all">
+                    <span class="material-symbols-outlined text-sm" [class.text-white]="activeOrder()?.status === 'ready' || activeOrder()?.status === 'served'">notifications_active</span>
+                  </div>
+                  <span class="text-[10px] mt-2 font-bold uppercase">Ready</span>
+                </div>
+              </div>
+
+              <!-- Payment options: only shown when NOT waiting for cash -->
+              <div *ngIf="activeOrder()?.status === 'served' && activeOrder()?.payment_status === 'pending'" class="animate-in fade-in zoom-in duration-500">
+                
+                <!-- Waiting for cash confirmation from KDS -->
+                <div *ngIf="activeOrder()?.payment_mode === 'cash'" class="p-6 rounded-xl bg-amber-50 border border-amber-200 text-center">
+                  <div class="size-14 mx-auto bg-amber-100 rounded-full flex items-center justify-center mb-4 animate-spin" style="animation: spin 3s linear infinite;">
+                    <span class="material-symbols-outlined text-amber-500 text-3xl">hourglass_top</span>
+                  </div>
+                  <h4 class="text-amber-700 font-black mb-1">Awaiting Cash Confirmation</h4>
+                  <p class="text-xs text-amber-600">Staff is confirming your cash payment. Please wait...</p>
+                </div>
+
+                <!-- Payment buttons (PayPal, Cash, Simulate) -->
+                <div *ngIf="activeOrder()?.payment_mode !== 'cash'" class="p-6 rounded-xl bg-green-500/10 border border-green-500/20 text-center">
+                  <h4 class="text-green-600 dark:text-green-400 font-bold mb-4">Your order has been served!</h4>
+                  <div id="paypal-button-container" class="w-full mb-4"></div>
+                  
+                  <div class="grid grid-cols-2 gap-3">
+                    <button (click)="handleCashPayment()" class="h-14 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-black flex items-center justify-center gap-2 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95 shadow-sm">
+                      <span class="material-symbols-outlined">payments</span> PAY CASH
+                    </button>
+                    <button (click)="handleManualPayment()" class="h-14 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-black flex items-center justify-center gap-2 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95 shadow-sm">
+                      <span class="material-symbols-outlined">bug_report</span> SIMULATE
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- E-Bill Modal -->
+        <div *ngIf="showEBill()" class="fixed inset-0 z-[150] flex items-center justify-center bg-background-dark/95 backdrop-blur-2xl p-4 animate-in fade-in duration-500">
+          <div class="w-full max-w-[400px] bg-white dark:bg-slate-950 rounded-[2.5rem] shadow-2xl overflow-hidden animate-zoom-in">
+            <div class="p-8 text-center bg-primary/5 border-b border-primary/10">
+              <div class="mx-auto size-16 bg-primary rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-primary/20 rotate-3">
+                <span class="material-symbols-outlined text-3xl text-white">receipt_long</span>
+              </div>
+              <h2 class="text-2xl font-black text-slate-900 dark:text-white mb-1">E-Bill Receipt</h2>
+              <p class="text-xs font-bold text-slate-500 uppercase tracking-widest">Table {{activeOrder()?.table_number}} • #{{activeOrder()?.id?.slice(-6)}}</p>
+            </div>
+            
+            <div class="p-8 bg-white dark:bg-slate-900/50">
+              <div class="space-y-4 mb-8">
+                <div *ngFor="let item of activeOrder()?.order_items" class="flex justify-between items-center group">
+                  <div class="flex items-center gap-3">
+                    <span class="size-6 rounded-lg bg-primary/10 text-primary text-[10px] font-black flex items-center justify-center">{{item.quantity}}x</span>
+                    <span class="text-sm font-bold text-slate-700 dark:text-slate-300">{{item.menu_items?.name}}</span>
+                  </div>
+                  <span class="text-sm font-black text-slate-900 dark:text-white">${{item.unit_price * item.quantity}}</span>
+                </div>
+                
+                <div class="pt-4 border-t-2 border-dashed border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                  <span class="text-xs font-black text-slate-400 uppercase">Paid via {{activeOrder()?.payment_mode}}</span>
+                  <span class="text-2xl font-black text-primary">${{activeOrder()?.total_price}}</span>
+                </div>
+              </div>
+
+              <!-- Screenshot Prompt -->
+              <div class="mb-8 p-4 bg-primary/10 rounded-2xl border border-primary/20 flex items-center gap-4 animate-pulse">
+                <span class="material-symbols-outlined text-primary scale-125">screenshot_region</span>
+                <p class="text-xs font-bold text-primary leading-tight">Please take a screenshot of this receipt for your future reference!</p>
+              </div>
+
+              <button (click)="closeEBill()" 
+                      class="w-full h-16 bg-slate-900 dark:bg-white dark:text-slate-900 text-white rounded-2xl font-black text-lg shadow-xl hover:scale-[1.02] active:scale-95 transition-all">
+                Close & Return
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="flex gap-3 p-4 overflow-x-auto no-scrollbar scroll-smooth">
+          <button (click)="selectCategory(null)" 
+            [class.bg-primary]="selectedCategoryId() === null"
+            [class.text-white]="selectedCategoryId() === null"
+            [class.bg-primary\/10]="selectedCategoryId() !== null"
+            [class.text-primary]="selectedCategoryId() !== null"
+            class="flex h-10 shrink-0 items-center justify-center gap-x-2 rounded-full px-6 transition-all">
+            <span class="text-sm font-semibold">All Menu</span>
+          </button>
+          <button *ngFor="let cat of categories()" (click)="selectCategory(cat.id)"
+            [class.bg-primary]="selectedCategoryId() === cat.id"
+            [class.text-white]="selectedCategoryId() === cat.id"
+            [class.bg-primary\/10]="selectedCategoryId() !== cat.id"
+            [class.text-primary]="selectedCategoryId() !== cat.id"
+            class="flex h-10 shrink-0 items-center justify-center gap-x-2 rounded-full px-6 hover:bg-primary/20 transition-all">
+            <span class="text-sm font-semibold">{{cat.name}}</span>
+          </button>
+        </div>
+
+        <div class="mt-4 px-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div *ngFor="let item of filteredMenuItems()" class="group bg-white dark:bg-slate-900 rounded-xl overflow-hidden border border-primary/5 hover:border-primary/30 transition-all shadow-sm">
+              <div class="aspect-[4/3] w-full bg-center bg-cover" [style.background-image]="'url(' + item.image_url + ')'"></div>
+              <div class="p-4">
+                <div class="flex justify-between items-start mb-1">
+                  <h3 class="text-slate-900 dark:text-slate-100 font-bold text-lg">{{item.name}}</h3>
+                  <span class="text-primary font-bold">${{item.price}}</span>
+                </div>
+                <p class="text-slate-500 dark:text-slate-400 text-sm leading-relaxed mb-4">{{item.description}}</p>
+                <button (click)="addToOrder(item)" class="w-full py-2.5 rounded-lg bg-primary/10 text-primary font-bold text-sm flex items-center justify-center gap-2 group-hover:bg-primary group-hover:text-white transition-all">
+                  <span class="material-symbols-outlined text-[18px]">add</span> Add to Order
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <!-- Sticky Bottom Order Bar -->
+      <div *ngIf="cart.totalItems() > 0 && !activeOrder()" class="fixed bottom-0 left-0 right-0 p-4 md:p-6 bg-gradient-to-t from-background-light dark:from-background-dark to-transparent pointer-events-none">
+        <div class="max-w-[800px] mx-auto pointer-events-auto">
+          <button (click)="placeOrder()" class="w-full h-16 bg-primary text-white rounded-2xl shadow-xl shadow-primary/30 flex items-center justify-between px-6 transition-transform active:scale-95 animate-in slide-in-from-bottom-8">
+            <div class="flex items-center gap-4">
+              <div class="flex items-center justify-center size-10 rounded-lg bg-white/20">
+                <span class="material-symbols-outlined">shopping_bag</span>
+              </div>
+              <div class="text-left">
+                <p class="text-xs font-medium text-white/80 uppercase tracking-wider leading-none">Your Order</p>
+                <p class="text-lg font-bold leading-tight">{{cart.totalItems()}} Items Added</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-4">
+              <span class="text-xl font-bold">${{cart.totalPrice() | number:'1.2-2'}}</span>
+              <span class="material-symbols-outlined">arrow_forward_ios</span>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
