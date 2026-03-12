@@ -32,6 +32,7 @@ export class SupabaseService {
   }
 
   async createOrder(order: Partial<Order>, items: OrderItem[]) {
+    // order will now potentially contain user_id
     const { data: orderData, error: orderError } = await this.supabase
       .from('orders')
       .insert(order)
@@ -70,6 +71,16 @@ export class SupabaseService {
       .order('created_at', { ascending: true }) as { data: Order[] | null, error: any };
   }
 
+  async getTableActiveOrders(tableNumber: number) {
+    return await this.supabase
+      .from('orders')
+      .select('*, order_items(*, menu_items(*))')
+      .eq('table_number', tableNumber)
+      .not('status', 'eq', 'cancelled')
+      .not('payment_status', 'eq', 'completed')
+      .order('created_at', { ascending: true }) as { data: Order[] | null, error: any };
+  }
+
   async updateOrderStatus(orderId: string, status: string) {
     return await this.supabase
       .from('orders')
@@ -83,6 +94,27 @@ export class SupabaseService {
       .eq('status', 'served')
       .order('created_at', { ascending: false })
       .limit(50) as { data: Order[] | null, error: any };
+  }
+
+  async getCompletedOrdersByDateRange(from: string, to: string) {
+    return await this.supabase
+      .from('orders')
+      .select('*, order_items(*, menu_items(*))')
+      .eq('status', 'served')
+      .gte('created_at', from)
+      .lte('created_at', to)
+      .order('created_at', { ascending: false }) as { data: Order[] | null, error: any };
+  }
+
+  async getUserActiveOrders(userId: string, tableNumber: number) {
+    return await this.supabase
+      .from('orders')
+      .select('*, order_items(*, menu_items(*))')
+      .eq('user_id', userId)
+      .eq('table_number', tableNumber)
+      .not('status', 'eq', 'cancelled')
+      .not('payment_status', 'eq', 'completed')
+      .order('created_at', { ascending: true }) as { data: Order[] | null, error: any };
   }
 
   async getOrderById(orderId: string) {

@@ -1,5 +1,6 @@
 import { Component, OnInit, signal, inject, OnDestroy, ChangeDetectorRef, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { SupabaseService } from '../../supabase.service';
 import { Order } from '../../models/cafe.models';
 import { RealtimeChannel } from '@supabase/supabase-js';
@@ -7,7 +8,7 @@ import { RealtimeChannel } from '@supabase/supabase-js';
 @Component({
   selector: 'app-kds',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './kds.component.html',
   styles: ``,
 })
@@ -20,7 +21,16 @@ export class KdsComponent implements OnInit, OnDestroy {
   orders = signal<Order[]>([]);
   completedOrdersCount = signal(0);
   currentTab = signal<'active' | 'completed'>('active');
-  now = Date.now(); // plain number — updated every second
+  
+  // New: Date Filters for Completed Tab
+  dateFilter = signal<'today' | '7days' | 'custom'>('today');
+  customFrom = signal<string>(new Date().toISOString().split('T')[0]);
+  customTo = signal<string>(new Date().toISOString().split('T')[0]);
+  
+  // New: Order expansion for details
+  expandedOrderId = signal<string | null>(null);
+
+  now = Date.now();
   private timerInterval?: any;
 
   async ngOnInit() {
@@ -28,13 +38,11 @@ export class KdsComponent implements OnInit, OnDestroy {
     await this.fetchStats();
     this.setupSubscription();
     
-    // Run interval OUTSIDE Angular zone to avoid triggering full app CD on every tick
-    // Then use zone.run() to update `now` and call detectChanges() only in this component
     this.zone.runOutsideAngular(() => {
       this.timerInterval = setInterval(() => {
         this.now = Date.now();
-        this.cdr.detectChanges(); // only re-renders THIS component
-      }, 1000); // update every second — smooth live clock
+        this.cdr.detectChanges();
+      }, 1000);
     });
   }
 
@@ -52,15 +60,41 @@ export class KdsComponent implements OnInit, OnDestroy {
     await this.fetchOrders();
   }
 
+  async setDateFilter(filter: 'today' | '7days' | 'custom') {
+    this.dateFilter.set(filter);
+    await this.fetchOrders();
+  }
+
   async fetchOrders() {
-    const { data } = this.currentTab() === 'active' 
-      ? await this.supabase.getActiveOrders()
-      : await this.supabase.getCompletedOrders();
-    
-    if (data) {
-      this.orders.set(data);
-      this.cdr.markForCheck();
+    if (this.currentTab() === 'active') {
+      const { data } = await this.supabase.getActiveOrders();
+      this.orders.set(data || []);
+    } else {
+      // Apply date filtering for completed tab
+      let fromDate = new Date();
+      let toDate = new Date();
+
+      if (this.dateFilter() === 'today') {
+        fromDate.setHours(0, 0, 0, 0);
+        toDate.setHours(23, 59, 59, 999);
+      } else if (this.dateFilter() === '7days') {
+        fromDate.setDate(fromDate.getDate() - 7);
+        fromDate.setHours(0, 0, 0, 0);
+        toDate.setHours(23, 59, 59, 999);
+      } else {
+        fromDate = new Date(this.customFrom());
+        fromDate.setHours(0, 0, 0, 0);
+        toDate = new Date(this.customTo());
+        toDate.setHours(23, 59, 59, 999);
+      }
+
+      const { data } = await this.supabase.getCompletedOrdersByDateRange(
+        fromDate.toISOString(),
+        toDate.toISOString()
+      );
+      this.orders.set(data || []);
     }
+    this.cdr.markForCheck();
   }
 
   async fetchStats() {
@@ -69,7 +103,7 @@ export class KdsComponent implements OnInit, OnDestroy {
   }
 
   setupSubscription() {
-    this.subscription = this.supabase.subscribeToOrders(async (payload) => {
+    this.subscription = this.supabase.subscribeToOrders(async () => {
       await this.fetchOrders();
       await this.fetchStats();
     });
@@ -83,26 +117,31 @@ export class KdsComponent implements OnInit, OnDestroy {
     }
   }
 
-  /** KDS: Confirm cash received for an order awaiting cash payment */
+  /** KDS: Confirm cash received AND mark as served together */
   async confirmCashPayment(orderId: string) {
     const { error } = await this.supabase.client
       .from('orders')
       .update({
         payment_status: 'completed',
         payment_mode: 'cash',
-        payment_id: 'CASH-' + Date.now()
+        payment_id: 'CASH-' + Date.now(),
+        status: 'served' // Mark as served immediately when staff confirms cash
       })
       .eq('id', orderId);
 
     if (!error) {
       await this.fetchOrders();
+      await this.fetchStats();
     }
   }
 
-  /** Only show elapsed time for active (non-served) orders */
+  toggleOrderDetails(orderId: string) {
+    this.expandedOrderId.set(this.expandedOrderId() === orderId ? null : orderId);
+  }
+
   getTimeElapsed(createdAt: string): string {
     const start = new Date(createdAt).getTime();
-    const elapsed = this.now - start; // this.now is a plain number updated every second
+    const elapsed = this.now - start;
     const totalMins = Math.floor(elapsed / 1000 / 60);
     const secs = Math.floor((elapsed / 1000) % 60);
     return `${totalMins}:${secs.toString().padStart(2, '0')}m`;

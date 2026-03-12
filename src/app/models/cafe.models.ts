@@ -25,6 +25,7 @@ export interface Order {
   payment_status: 'pending' | 'completed' | 'failed';
   payment_mode?: 'paypal' | 'cash';
   payment_id?: string;
+  user_id?: string;
   created_at?: string;
   order_items?: OrderItem[];
 }
